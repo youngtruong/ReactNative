@@ -1,3 +1,8 @@
+# Build React Native core and dependencies together from source. Mixing a cached
+# prebuilt core with unavailable prebuilt dependencies can break pod resolution.
+ENV['RCT_USE_RN_DEP'] ||= '0'
+ENV['RCT_USE_PREBUILT_RNCORE'] ||= '0'
+
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(

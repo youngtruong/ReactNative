@@ -1,97 +1,113 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# SkyWeather — React Native CLI
 
-# Getting Started
+Ứng dụng thời tiết tiếng Việt chạy trực tiếp trong dự án React Native CLI hiện có. React Native 0.87.1 + React 19.2.3 + TypeScript; không phụ thuộc Expo.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Cài đặt
 
-## Step 1: Start Metro
+```bash
+cd mobile
+nvm use
+npm ci
+```
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+Node được dự án khóa ở 24.11.0 trong `.nvmrc`. Android cần Android Studio, SDK Platform 37, Build Tools 37.0.0, NDK 27.1.12297006 và JDK 17 theo cấu hình hiện có.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Terminal thứ nhất:
 
-```sh
-# Using npm
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Terminal thứ hai:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+npm run android -- --no-packager
 ```
 
-### iOS
+Có thể mở máy ảo hiện có: `emulator -avd MobileApp_Android`. Với Android thật, bật USB debugging và chấp nhận quyền gỡ lỗi, chạy `adb devices`, `adb reverse tcp:8081 tcp:8081` trước khi chạy app.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+iOS cần macOS + Xcode và CocoaPods:
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```bash
+cd ios
+pod install
+cd ..
+npm run ios -- --simulator MobileApp-iPhone --no-packager
 ```
 
-Then, and every time you update your native dependencies, run:
+`ios/Podfile` mặc định build React Native core và dependencies từ source để tránh trường hợp prebuilt core tải được nhưng prebuilt dependencies bị lỗi mạng. Lần build iOS đầu sẽ lâu hơn. Có thể bật prebuilt khi môi trường hỗ trợ bằng `RCT_USE_RN_DEP=1 RCT_USE_PREBUILT_RNCORE=1 pod install`.
 
-```sh
-bundle exec pod install
+Với iPhone thật, mở `ios/MobileApp.xcworkspace`, chọn Apple Development Team của bạn trong Signing & Capabilities rồi Run. Bundle ID và cấu hình signing hiện có được giữ nguyên; tên hiển thị đổi thành SkyWeather. Rebuild native app sau khi thêm dependency hoặc thay đổi quyền; reload JavaScript không đủ.
+
+## Chức năng và kiến trúc
+
+Màn hình mặc định là SkyWeather, dùng React Navigation bottom tabs: Thời tiết, Địa điểm, Cài đặt. Các màn hình cũ được giữ trong `src/screens/`; entry point mới nằm ở `App.tsx`.
+
+```text
+mobile/
+  App.tsx                         # Entry SkyWeather
+  src/skyweather/
+    SkyWeatherApp.tsx              # Query provider, state, tabs
+    screens/                      # Weather, Places, Settings
+    components/                   # UI, SVG gradient, Lucide icons, chart
+    services/                     # Open-Meteo, storage, location adapter native
+    hooks/                        # Query/cache, state, debounce
+    types/                        # Kiểu dữ liệu API/UI
+    utils/                        # WMO tiếng Việt, đơn vị, thời gian
+    theme/                        # Sáng/tối và màu bầu trời
+  tests/weather.test.ts            # Kiểm thử logic (Node test runner)
+  __tests__/App.test.tsx            # Smoke test render (Jest)
+  scripts/check-api.ts             # Kiểm tra API thật
+  android/                        # Manifest quyền, MainActivity
+  ios/                            # Info.plist quyền và Pods
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+- Dữ liệu thời tiết hiện tại, 24 giờ (bao gồm giờ hiện tại), 7 ngày, biểu đồ nhiệt độ, độ ẩm, gió/hướng gió, lượng mưa hiện tại, UV theo giờ, tầm nhìn, áp suất mực biển, bình minh/hoàng hôn.
+- Gradient theo mã thời tiết/ngày/đêm, thẻ bo tròn, Safe Area, giao diện sáng/tối/hệ thống. Skeleton dùng animation native driver và hỗ trợ Reduce Motion.
+- Tìm thành phố Việt Nam/quốc tế với debounce 400 ms và AbortSignal hủy phản hồi cũ. Khu vực/quốc gia phân biệt thành phố trùng tên.
+- Lưu/xóa yêu thích bằng ngôi sao; chạm địa điểm để đổi dự báo. Địa điểm GPS ghi “Vị trí hiện tại” vì Open-Meteo không có reverse geocoding.
+- Đơn vị °C/°F và km/h/m/s chuyển trên thiết bị, không gọi lại API. Cài đặt, yêu thích và địa điểm được lưu bằng AsyncStorage.
+- TanStack Query chia cache theo tọa độ, stale time 10 phút, timeout API 12 giây, retry một lần. Mở lại app đọc dự báo đã lưu trước khi gọi API; mất mạng hiển thị nhãn dữ liệu đã lưu và thời điểm tải theo múi giờ địa điểm. Lần đầu offline chưa có cache sẽ hiện lỗi và nút thử lại.
+- Chỉ số thiếu là “Chưa có dữ liệu”, không tạo giá trị giả. Biểu đồ không nối qua điểm thiếu.
 
-```sh
-# Using npm
-npm run ios
+## Thư viện và quyền vị trí
 
-# OR using Yarn
-yarn ios
+Đã thêm React Navigation native/bottom-tabs, TanStack Query, AsyncStorage, NetInfo, @react-native-community/geolocation, react-native-screens, react-native-svg và lucide-react-native. Phiên bản chính xác nằm trong `package-lock.json`. Gradient và biểu đồ dùng SVG; StatusBar dùng React Native. Native modules autolink qua CLI và CocoaPods, không cần thêm bằng tay vào MainApplication.
+
+`android/app/src/main/AndroidManifest.xml` có `ACCESS_COARSE_LOCATION` và `ACCESS_FINE_LOCATION`. Adapter dùng `PermissionsAndroid.requestMultiple` khi người dùng chọn vị trí hiện tại; chấp nhận cả vị trí gần đúng. `ios/MobileApp/Info.plist` có `NSLocationWhenInUseUsageDescription`; Geolocation cấu hình `authorizationLevel: 'whenInUse'`, không theo dõi vị trí nền. Tham khảo [tài liệu thư viện geolocation](https://github.com/michalchudziak/react-native-geolocation).
+
+Từ chối quyền vẫn tìm thành phố thủ công được. GPS tắt, không có vị trí hoặc timeout sẽ có thông báo và không thay đổi địa điểm hiện tại.
+
+Android `MainActivity` cấu hình `RNScreensFragmentFactory` theo [React Navigation](https://reactnavigation.org/docs/getting-started/) để khôi phục activity an toàn.
+
+## API
+
+Đã đối chiếu [Forecast API](https://open-meteo.com/en/docs) và [Geocoding API](https://open-meteo.com/en/docs/geocoding-api) chính thức.
+
+- `https://api.open-meteo.com/v1/forecast`: `timezone=auto`, `forecast_days=7`, danh sách current/hourly/daily trong `services/api.ts`.
+- `https://geocoding-api.open-meteo.com/v1/search`: `language=vi`, `count=15`, `format=json`.
+- Giờ ISO từ forecast hiển thị theo giờ địa phương API, không chuyển sang múi giờ điện thoại. Thời điểm tải dùng IANA timezone API trả về.
+- Không cần API key cho endpoint công cộng. [Điều khoản](https://open-meteo.com/en/terms) và [pricing](https://open-meteo.com/en/pricing) áp dụng khi phát hành/thương mại. Nguồn Open-Meteo / CC BY 4.0 được ghi trong UI.
+
+## Kiểm tra
+
+```bash
+npm run typecheck
+npm run test:weather
+npm test -- --runInBand
+npm run test:live
+npm run lint
+cd android
+./gradlew assembleDebug
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Ngày 07/10/2026, sau chuyển sang CLI: TypeScript qua, 12/12 tests logic qua và smoke test render Jest qua; ESLint cho mã SkyWeather không có lỗi (còn cảnh báo style). Metro đã đóng gói Android; Gradle assembleDebug build APK thành công; CocoaPods đã liên kết 6 thư viện native thành công bằng chế độ source. APK đã cài và mở trên máy ảo MobileApp_Android qua Metro CLI; không thấy lỗi JavaScript/native trong logcat khi khởi động. Luồng API thật đã được kiểm tra trước chuyển đổi, logic service được giữ nguyên.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Các tests logic kiểm tra đổi đơn vị, mã WMO, dữ liệu thiếu, thời gian qua nửa đêm, đổi tọa độ, từ chối quyền không gọi GPS, search/cancel, lỗi mạng, phản hồi không hợp lệ, yêu thích và cache sau lỗi. Jest mock native modules; không thay thế kiểm thử quyền/GPS trên thiết bị.
 
-## Step 3: Modify your app
+Đã kiểm tra màn hình thời tiết trên simulator iOS sau khi sửa nền gradient bị hụt do SVG nằm trong khung có padding; nền phủ kín, góc bo và biểu tượng SVG hiển thị đúng. Chưa kiểm tra đầy đủ các luồng UI iOS, build IPA, quyền/GPS iOS thật và hiệu năng animation. Npm báo advisories trong cây dependency; cần kiểm tra upstream trước phát hành, không chạy audit fix --force tự động vì có thể thay đổi phiên bản React Native.
 
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Kiểm thử thiết bị cần làm: tìm thành phố trùng tên/nhập nhanh; thêm/xóa và khởi động lại app; đổi đơn vị/giao diện; từ chối rồi cấp quyền vị trí; tắt GPS; tải dữ liệu rồi bật máy bay và mở lại app; cài mới offline; màn hình nhỏ/tablet/cỡ chữ lớn/Reduce Motion.

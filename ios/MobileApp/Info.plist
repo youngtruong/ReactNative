@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>MobileApp</string>
+	<string>Easy Chat</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>SkyWeather sử dụng vị trí khi bạn chọn Dùng vị trí hiện tại để tải dự báo địa phương.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kết nối Metro trên máy tính để chạy và cập nhật ứng dụng khi phát triển.</string>
 	<key>RCTNewArchEnabled</key>
